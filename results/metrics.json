@@ -1,0 +1,175 @@
+{
+  "data": {
+    "raw_rows": 13611,
+    "duplicates_removed": 68,
+    "analysis_rows": 13543,
+    "features": 16,
+    "missing_values": 0,
+    "raw_class_counts": {
+      "BARBUNYA": 1322,
+      "BOMBAY": 522,
+      "CALI": 1630,
+      "DERMASON": 3546,
+      "HOROZ": 1928,
+      "SEKER": 2027,
+      "SIRA": 2636
+    },
+    "analysis_class_counts": {
+      "BARBUNYA": 1322,
+      "BOMBAY": 522,
+      "CALI": 1630,
+      "DERMASON": 3546,
+      "HOROZ": 1860,
+      "SEKER": 2027,
+      "SIRA": 2636
+    }
+  },
+  "split": {
+    "train": 10834,
+    "test": 2709,
+    "test_fraction": 0.2,
+    "stratified": true,
+    "seed": 42,
+    "cv_folds": 5
+  },
+  "search": {
+    "method": "base-2 staged: coarse grid plus local refinement",
+    "coarse_C_exponents": [
+      -5,
+      -1,
+      3,
+      7,
+      11
+    ],
+    "coarse_gamma_exponents": [
+      -15,
+      -11,
+      -7,
+      -3,
+      1
+    ],
+    "refinement": "exponente ganador y vecinos ±1"
+  },
+  "multiclass_cv": {
+    "best_C": 64.0,
+    "best_gamma": 0.015625,
+    "best_cv_f1_macro": 0.9448071804305018,
+    "best_cv_accuracy": 0.9333583880766692
+  },
+  "binary_selection": {
+    "method": "mayor confusión simétrica en predicciones OOF de 5 pliegues del entrenamiento",
+    "classes": [
+      "DERMASON",
+      "SIRA"
+    ],
+    "oof_confusions": 348,
+    "train_rows": 4946,
+    "test_rows": 1236
+  },
+  "binary_results": [
+    {
+      "kernel": "Lineal",
+      "cv_accuracy": 0.9241819611688167,
+      "cv_f1_macro": 0.9221928019912233,
+      "test_accuracy": 0.912621359223301,
+      "test_f1_macro": 0.9105967450271248,
+      "support_vectors": 912,
+      "best_params": "{\"svc__C\": 128.0}"
+    },
+    {
+      "kernel": "Polinomial",
+      "cv_accuracy": 0.9296414090347355,
+      "cv_f1_macro": 0.9275718536811721,
+      "test_accuracy": 0.9134304207119741,
+      "test_f1_macro": 0.9110788377557916,
+      "support_vectors": 873,
+      "best_params": "{\"svc__C\": 0.5, \"svc__degree\": 3, \"svc__gamma\": \"scale\"}"
+    },
+    {
+      "kernel": "RBF",
+      "cv_accuracy": 0.9304503069113785,
+      "cv_f1_macro": 0.9285472573980625,
+      "test_accuracy": 0.9182847896440129,
+      "test_f1_macro": 0.9162857133277227,
+      "support_vectors": 858,
+      "best_params": "{\"svc__C\": 128.0, \"svc__gamma\": 0.00390625}"
+    }
+  ],
+  "smo": {
+    "n_subset": 400,
+    "C": 8.0,
+    "gamma": 0.00390625,
+    "iterations": 254,
+    "converged": true,
+    "m": -1.9078104064450585,
+    "M": -1.9087365575051911,
+    "m_minus_M": 0.0009261510601326073,
+    "equality_residual": 1.4210854715202004e-14,
+    "dual_own": 636.5527291048519,
+    "dual_libsvm": 636.5528489255446,
+    "max_abs_score_difference": 0.0021080791339120886,
+    "prediction_agreement": 1.0,
+    "support_vectors_own": 95,
+    "support_vectors_libsvm": 95
+  },
+  "custom_multiclass_demo": [
+    {
+      "estrategia": "OvR propio",
+      "n_entrenamiento": 420,
+      "n_prueba": 210,
+      "accuracy": 0.9142857142857143,
+      "f1_macro": 0.9305219630552833,
+      "fit_s": 0.20066190000034112,
+      "predict_s": 0.003711999999723048,
+      "n_modelos_binarios": 7
+    },
+    {
+      "estrategia": "OvO propio",
+      "n_entrenamiento": 420,
+      "n_prueba": 210,
+      "accuracy": 0.9142857142857143,
+      "f1_macro": 0.9317182039178196,
+      "fit_s": 0.10491250000086438,
+      "predict_s": 0.0043411999995441874,
+      "n_modelos_binarios": 21
+    }
+  ],
+  "multiclass_test": {
+    "OvR": {
+      "accuracy": 0.9224806201550387,
+      "f1_macro": 0.9337275019330714,
+      "fit_s": 3.9520690999997896,
+      "predict_s": 2.366754200000287,
+      "n_binary_models": 7,
+      "support_vectors_sum": 4038
+    },
+    "OvO": {
+      "accuracy": 0.9235880398671097,
+      "f1_macro": 0.934961311771873,
+      "fit_s": 1.1646070999995572,
+      "predict_s": 2.710996100000557,
+      "n_binary_models": 21,
+      "support_vectors_sum": 2416
+    }
+  },
+  "timing_power_fit": [
+    {
+      "strategy": "OvO",
+      "c": 0.00025927772158081656,
+      "theta": 0.8628814217675691,
+      "r2_log_log": 0.9621571174301171
+    },
+    {
+      "strategy": "OvR",
+      "c": 4.9138013110265e-06,
+      "theta": 1.46729880831485,
+      "r2_log_log": 0.9778071034027562
+    }
+  ],
+  "notes": {
+    "no_imputation": "No hay faltantes; se usa StandardScaler dentro del pipeline.",
+    "test_policy": "El test se usa una sola vez para métricas finales.",
+    "custom_scope": "SMO y wrappers propios se verifican en subconjuntos por su costo O(n²); los resultados completos usan SVC/LIBSVM.",
+    "timing": "Tres repeticiones; se reporta mediana e IQR. theta es empírico, no complejidad teórica."
+  }
+}

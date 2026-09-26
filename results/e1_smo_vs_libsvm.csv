@@ -1,0 +1,2 @@
+n_subset,C,gamma,iterations,converged,m,M,m_minus_M,equality_residual,dual_own,dual_libsvm,max_abs_score_difference,prediction_agreement,support_vectors_own,support_vectors_libsvm
+400,8.0,0.00390625,254,True,-1.9078104064450585,-1.9087365575051911,0.0009261510601326073,1.4210854715202004e-14,636.5527291048519,636.5528489255446,0.0021080791339120886,1.0,95,95
