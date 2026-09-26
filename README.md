@@ -1,30 +1,30 @@
 # Optimización con SVM — Dry Bean Dataset
 
-Proyecto reproducible que corrige y completa el notebook de SVM para que sea coherente con el informe de Optimización. Incluye limpieza, validación cruzada, SMO propio, comparación de kernels, OvR/OvO, sensibilidad a hiperparámetros y costo computacional.
+Proyecto de clasificación de siete variedades de frijol seco mediante máquinas de vectores soporte (SVM). Incluye limpieza de datos, validación cruzada, una implementación de SMO, comparación de kernels, estrategias multiclase OvR/OvO, análisis de hiperparámetros y medición del costo computacional.
 
-## Explicado como para un niño
+## Descripción del problema
 
-Cada frijol tiene 16 medidas. La computadora debe adivinar a cuál de 7 familias pertenece.
+Cada observación contiene 16 medidas geométricas de un frijol. El objetivo es identificar a cuál de las siete variedades pertenece.
 
-Una SVM intenta dibujar una cerca entre las familias. Queremos una cerca que deje un pasillo ancho y que se equivoque poco. `C` indica cuánto nos molestan los errores y `gamma` controla qué tan curvada puede ser la cerca RBF.
+La SVM construye fronteras de separación entre las clases. El parámetro `C` controla la penalización de los errores y `gamma` determina el alcance de la influencia de cada observación en el kernel RBF.
 
-Separamos los datos en:
+Los datos se dividen en:
 
-- **80 % para estudiar:** aquí se eligen `C`, `gamma` y los modelos mediante validación cruzada.
-- **20 % para el examen final:** no se usa para tomar decisiones.
+- **80 % para entrenamiento:** se usa para ajustar los modelos y seleccionar `C` y `gamma` mediante validación cruzada.
+- **20 % para prueba:** permanece reservado hasta la evaluación final.
 
-## Correcciones respecto al notebook original
+## Metodología
 
-| Tema | Corrección aplicada |
+| Etapa | Procedimiento |
 |---|---|
 | Duplicados | Se eliminan 68 filas exactas antes del split: 13 611 → 13 543. |
-| Faltantes | Hay 0; se retiró la imputación por mediana. |
+| Faltantes | No se aplica imputación porque las 16 variables no contienen valores faltantes. |
 | Validación | 5 pliegues estratificados, semilla 42. |
 | Búsqueda | Potencias de 2 en dos etapas: malla amplia y refinamiento local. |
 | Caso binario | La pareja se elige por mayor confusión OOF en entrenamiento. Resultó DERMASON–SIRA. |
-| Tablas | Se generan desde resultados reales; no contienen métricas escritas a mano. |
+| Evaluación | Las métricas y tablas se generan directamente durante la ejecución. |
 | SMO propio | Kernels lineal/polinomial/RBF, pareja de máxima violación y parada `m-M`. |
-| Multiclase | OvR y OvO propios en demo acotada; comparación completa con `SVC`. |
+| Multiclase | OvR y OvO propios en un subconjunto; comparación completa con `SVC`. |
 | E4 | Incluye exactitud, F1 macro y cantidad de vectores soporte. |
 | E5 | Tres repeticiones, mediana, IQR, ajuste `T(m)=c·m^theta` y `R²`. |
 
@@ -64,18 +64,18 @@ La ejecución completa puede tardar varios minutos. Los resultados multiclase ya
 ## Estructura
 
 ```text
-OPTI.ipynb                    notebook explicado y ejecutado
+OPTI.ipynb                    análisis completo y ejecutado
 data/Dry_Bean_Dataset.xlsx   copia original de los datos
 src/smo.py                   SMO propio y wrappers OvR/OvO
 src/experiments.py           protocolo E1–E5 y generación de resultados
 run_experiments.py           entrada para repetir todos los experimentos
 tests/test_smo.py            comparación automática con LIBSVM
-figures/                     12 gráficas listas para el informe
+figures/                     gráficas generadas por los experimentos
 results/                     tablas CSV y metrics.json
-GUIA_INFORME.md              lista de tablas, figuras y redacción sugerida
+RESULTADOS.md                relación de resultados, tablas y figuras
 ```
 
-## Qué debe entrar al informe
+## Contenido del análisis
 
 1. Tabla de 13 611 filas originales, 68 duplicados, 13 543 filas analíticas y cero faltantes.
 2. Distribución por clase antes/después de la limpieza.
@@ -88,15 +88,13 @@ GUIA_INFORME.md              lista de tablas, figuras y redacción sugerida
 9. E5: tiempos con mediana/IQR, `theta` y `R²`.
 10. Limitaciones y conclusiones prudentes.
 
-La correspondencia exacta de archivos está en [`GUIA_INFORME.md`](GUIA_INFORME.md).
+La relación exacta entre experimentos y archivos está en [`RESULTADOS.md`](RESULTADOS.md).
 
 ## Datos y atribución
 
 El archivo proviene de [UCI Dry Bean](https://archive.ics.uci.edu/dataset/602/dry+bean+dataset), DOI [10.24432/C50S4B](https://doi.org/10.24432/C50S4B), y también se distribuye en [Kaggle](https://www.kaggle.com/datasets/muratkokludataset/dry-bean-dataset). Cita: Koklu, M. y Ozkan, I. A. (2020), *Multiclass classification of dry beans using computer vision and machine learning techniques*.
 
-El punto de partida de código fue [`cruz-eng/ml-opti`](https://github.com/cruz-eng/ml-opti). Esta versión corrige la metodología, agrega reproducibilidad y conserva su licencia MIT.
-
-## Alcance honesto
+## Limitaciones
 
 - La implementación NumPy de SMO se valida en subconjuntos por su costo de memoria `O(n²)`; los experimentos completos usan `SVC`/LIBSVM.
 - Los tiempos dependen del equipo y no demuestran por sí solos complejidad asintótica.

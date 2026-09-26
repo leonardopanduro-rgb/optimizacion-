@@ -1,4 +1,4 @@
-"""Experimentos reproducibles del informe: E1--E5.
+"""Experimentos reproducibles de clasificación con SVM: E1--E5.
 
 Decisiones metodológicas importantes:
 - se eliminan duplicados exactos antes de la partición;
@@ -82,8 +82,8 @@ def _staged_rbf_search(X, y):
     """Búsqueda base 2 amplia y refinamiento local reproducible.
 
     La fase gruesa cubre cinco órdenes de magnitud. La fase fina añade los
-    exponentes vecinos del mejor punto sin pagar el costo de toda la malla
-    cartesiana extrema descrita como ejemplo en el Hito I.
+    exponentes vecinos del mejor punto para reducir el costo de evaluar una
+    malla cartesiana completa.
     """
     coarse = _grid_search(
         X,
@@ -451,10 +451,10 @@ def run_all(root):
     missing = int(raw.isna().sum().sum())
     duplicates = int(raw.duplicated().sum())
     if missing != 0:
-        raise ValueError("El informe dice que no hay faltantes; el archivo leído sí los contiene")
+        raise ValueError("El archivo contiene valores faltantes y requiere revisar el preprocesamiento")
     df = raw.drop_duplicates().reset_index(drop=True)
     if duplicates != 68 or len(df) != 13543:
-        raise ValueError("El conteo de duplicados no coincide con el dataset del informe")
+        raise ValueError("El conteo de duplicados no coincide con el dataset esperado")
     _plot_eda(df, raw, figdir)
     X = df.drop(columns="Class")
     y = df["Class"]

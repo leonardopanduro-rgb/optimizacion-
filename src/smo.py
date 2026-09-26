@@ -2,8 +2,8 @@
 
 El criterio de trabajo sigue la idea de *maximum violating pair*:
 se eligen los índices que maximizan la brecha ``m - M`` de KKT y se
-actualizan dos multiplicadores a la vez. No pretende reemplazar LIBSVM;
-sirve para verificar la formulación dual descrita en el informe.
+actualizan dos multiplicadores a la vez. La implementación permite comprobar
+numéricamente la solución dual y las condiciones KKT en conjuntos pequeños.
 """
 
 from __future__ import annotations
