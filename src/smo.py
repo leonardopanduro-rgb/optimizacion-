@@ -69,7 +69,7 @@ class SMOBinary:
         alpha = np.zeros(n, dtype=float)
         gradient = -np.ones(n, dtype=float)  # Q @ alpha - 1
         gap_history = []
-        converged = False
+        termination_reason = "max_iter"
 
         for iteration in range(1, self.max_iter + 1):
             i_up, i_low = self._working_sets(alpha, y)
@@ -79,8 +79,8 @@ class SMOBinary:
             i = int(up_indices[np.argmax(score[up_indices])])
             m = float(score[i])
 
-            # Probar primero los candidatos con menor puntuación. Si dos puntos
-            # son idénticos, eta puede ser cero y se pasa al siguiente candidato.
+            # Probar primero los candidatos con menor puntuación. Los pares
+            # con eta cero también pueden mejorar el objetivo dual.
             candidates = low_indices[np.argsort(score[low_indices])]
             updated = False
             for j_value in candidates:
@@ -90,12 +90,11 @@ class SMOBinary:
                 M = float(score[j])
                 gap = m - M
                 if gap <= self.tol:
-                    converged = True
+                    # Un candidato sin violación no certifica a los anteriores
+                    # que pudieron descartarse. Comprobar KKT global al final.
                     break
 
                 eta = float(K[i, i] + K[j, j] - 2.0 * K[i, j])
-                if eta <= 1e-14:
-                    continue
 
                 # Dirección factible: Δalpha_i=t*y_i, Δalpha_j=-t*y_j.
                 lower_i, upper_i = (
@@ -113,7 +112,22 @@ class SMOBinary:
                 if upper - lower <= 1e-14:
                     continue
 
-                step = float(np.clip(gap / eta, lower, upper))
+                # Ganancia dual: gap*t - eta*t**2/2. Una eta positiva,
+                # por pequeña que sea, conserva la solución cuadrática.
+                if eta > 0.0:
+                    # Evitar dividir por una eta minúscula si el máximo libre
+                    # queda fuera del intervalo factible (gap > 0, upper >= 0).
+                    step = float(upper if gap >= eta * upper else np.clip(gap / eta, lower, upper))
+                elif eta == 0.0:
+                    step = float(upper)
+                else:
+                    # Curvatura negativa: comparar extremos y conservar cero
+                    # como opción. Con un kernel PSD, eta no es negativa en
+                    # aritmética exacta; aquí puede haber error numérico.
+                    step = max(
+                        (0.0, float(lower), float(upper)),
+                        key=lambda t: t * (gap - 0.5 * eta * t),
+                    )
                 if abs(step) <= 1e-14:
                     continue
                 delta_i = step * y[i]
@@ -125,11 +139,13 @@ class SMOBinary:
                 updated = True
                 break
 
-            if converged:
-                break
             if not updated:
+                termination_reason = "stalled"
                 break
 
+        # Recalcular desde alpha evita certificar con un gradiente acumulado
+        # que puede haber sufrido deriva numérica.
+        gradient = Q @ alpha - 1.0
         i_up, i_low = self._working_sets(alpha, y)
         score = -y * gradient
         m = float(np.max(score[i_up]))
@@ -144,12 +160,26 @@ class SMOBinary:
         self.b_ = b
         self.support_ = np.flatnonzero(alpha > 1e-8)
         self.n_iter_ = iteration
-        self.converged_ = bool(converged or (m - M <= self.tol))
         self.m_ = m
         self.M_ = M
         self.kkt_gap_ = m - M
         self.equality_residual_ = float(abs(alpha @ y))
         self.dual_objective_ = float(alpha.sum() - 0.5 * z @ K @ z)
+        # Factibilidad a escala de redondeo; tol sigue siendo la tolerancia KKT.
+        roundoff = 64.0 * np.finfo(float).eps
+        box_tol = roundoff * max(1.0, self.C)
+        equality_tol = roundoff * max(1.0, float(np.abs(alpha).sum()))
+        self.converged_ = bool(
+            np.all(np.isfinite(alpha))
+            and np.all(np.isfinite(gradient))
+            and np.isfinite(b)
+            and np.isfinite(self.dual_objective_)
+            and np.all(alpha >= -box_tol)
+            and np.all(alpha <= self.C + box_tol)
+            and self.equality_residual_ <= equality_tol
+            and self.kkt_gap_ <= self.tol
+        )
+        self.termination_reason_ = "converged" if self.converged_ else termination_reason
         self.gap_history_ = np.asarray(gap_history)
         return self
 
