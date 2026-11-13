@@ -68,7 +68,9 @@ class SMOBinary:
         Q = np.outer(y, y) * K
         alpha = np.zeros(n, dtype=float)
         gradient = -np.ones(n, dtype=float)  # Q @ alpha - 1
-        gap_history = []
+        gap_history = []        # residuo KKT global m - M al inicio de cada iteración
+        pair_gap_history = []   # diferencia r_i - r_j del par efectivamente actualizado
+        dual_history = []       # D(alpha) al inicio de cada iteración
         termination_reason = "max_iter"
 
         for iteration in range(1, self.max_iter + 1):
@@ -78,6 +80,10 @@ class SMOBinary:
             low_indices = np.flatnonzero(i_low)
             i = int(up_indices[np.argmax(score[up_indices])])
             m = float(score[i])
+            # Residuo global: M es el mínimo sobre todo I_low, no el del candidato.
+            gap_history.append(m - float(np.min(score[low_indices])))
+            # D = 1'a - a'Qa/2 = (1'a - a'G)/2, con G = Qa - 1: costo O(n).
+            dual_history.append(0.5 * (alpha.sum() - alpha @ gradient))
 
             # Probar primero los candidatos con menor puntuación. Los pares
             # con eta cero también pueden mejorar el objetivo dual.
@@ -135,7 +141,7 @@ class SMOBinary:
                 alpha[i] += delta_i
                 alpha[j] += delta_j
                 gradient += Q[:, i] * delta_i + Q[:, j] * delta_j
-                gap_history.append(gap)
+                pair_gap_history.append(gap)
                 updated = True
                 break
 
@@ -180,8 +186,27 @@ class SMOBinary:
             and self.kkt_gap_ <= self.tol
         )
         self.termination_reason_ = "converged" if self.converged_ else termination_reason
-        self.gap_history_ = np.asarray(gap_history)
+        # Se añade el residuo final para que la curva termine en el valor certificado.
+        self.gap_history_ = np.asarray(gap_history + [self.kkt_gap_])
+        self.pair_gap_history_ = np.asarray(pair_gap_history)
+        self.dual_history_ = np.asarray(dual_history + [self.dual_objective_])
         return self
+
+    def pointwise_kkt_violation(self, box_tol: float = 1e-8) -> float:
+        """Máxima violación KKT puntual usando el sesgo realmente devuelto.
+
+        alpha=0 exige t>=1; 0<alpha<C exige t=1; alpha=C exige t<=1,
+        con t_i = y_i f(x_i). Devuelve el máximo sobre i.
+        """
+        t = self.y_ * self.decision_function(self.X_)
+        at_zero = self.alpha_ <= box_tol
+        at_c = self.alpha_ >= self.C - box_tol
+        free = ~(at_zero | at_c)
+        viol = np.zeros_like(t)
+        viol[at_zero] = np.maximum(0.0, 1.0 - t[at_zero])
+        viol[at_c] = np.maximum(0.0, t[at_c] - 1.0)
+        viol[free] = np.abs(1.0 - t[free])
+        return float(viol.max())
 
     def decision_function(self, X):
         X = np.asarray(X, dtype=float)
@@ -246,6 +271,21 @@ class SMOOneVsOne:
             votes[:, i_neg] += score < 0
             margins[:, i_pos] += score
             margins[:, i_neg] -= score
-        # Un margen pequeño solo rompe empates; el número de votos domina.
-        combined = votes + 1e-9 * margins
-        return self.classes_[np.argmax(combined, axis=1)]
+        return self.classes_[self._lexicographic_choice(votes, margins)]
+
+    @staticmethod
+    def _lexicographic_choice(votes, margins):
+        """Orden lexicográfico: más votos; luego mayor margen; luego primera clase.
+
+        Sustituye a votes + 1e-9 * margins, que no garantiza que los votos
+        dominen cuando los márgenes acumulados son grandes.
+        """
+        n_classes = votes.shape[1]
+        order = np.arange(n_classes)
+        # np.lexsort ordena por la última clave primero; se usa el signo para
+        # que el máximo quede al inicio y el índice menor gane el empate final.
+        choice = np.empty(len(votes), dtype=int)
+        for row in range(len(votes)):
+            keys = (order, -margins[row], -votes[row])
+            choice[row] = np.lexsort(keys)[0]
+        return choice

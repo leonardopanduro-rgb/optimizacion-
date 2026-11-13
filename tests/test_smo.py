@@ -102,3 +102,77 @@ def test_iteration_limit_does_not_certify_convergence():
     assert own.kkt_gap_ > own.tol
     assert not own.converged_
     assert own.termination_reason_ == "max_iter"
+
+
+# --- Ejemplos resueltos a mano en el informe (Hito II) ---------------------
+
+
+def test_hand_example_hard_margin_four_points():
+    # Sección III-B: w=(1,0), b=-1, margen 1, P=D=1/2.
+    X = np.array([[2.0, 0.0], [2.0, 1.0], [0.0, 0.0], [0.0, 1.0]])
+    y = np.array([1.0, 1.0, -1.0, -1.0])
+    own = SMOBinary(C=1e6, kernel="linear", tol=1e-9).fit(X, y)
+    w = (own.alpha_ * y) @ X
+    np.testing.assert_allclose(w, [1.0, 0.0], atol=1e-8)
+    assert own.b_ == pytest.approx(-1.0, abs=1e-8)
+    assert own.dual_objective_ == pytest.approx(0.5, abs=1e-10)
+    assert own.converged_
+
+
+def test_hand_example_smo_two_points():
+    # Sección V-G: una iteración da alpha=(1/2,1/2), w=1, b=0, D=1/2.
+    X = np.array([[1.0], [-1.0]])
+    y = np.array([1.0, -1.0])
+    own = SMOBinary(C=1.0, kernel="linear", tol=1e-12).fit(X, y)
+    np.testing.assert_allclose(own.alpha_, [0.5, 0.5], atol=1e-14)
+    assert own.b_ == pytest.approx(0.0, abs=1e-14)
+    assert own.dual_objective_ == pytest.approx(0.5)
+    assert own.n_iter_ <= 2
+    # La historia global empieza en m-M=2 y termina en 0.
+    assert own.gap_history_[0] == pytest.approx(2.0)
+    assert own.gap_history_[-1] == pytest.approx(0.0, abs=1e-14)
+    assert own.pointwise_kkt_violation() < 1e-12
+
+
+@pytest.mark.parametrize(
+    "C, w_expected, b_expected",
+    [
+        (0.2, 0.5, 0.0),       # tramo C < 2/5: w = 5C/2, b = 1 - 5C
+        (1.0, 1.0, -1.0),      # tramo 2/5 <= C <= 2: candidato A es óptimo
+        (4.0, 2.0, -1.0),      # tramo 2 <= C < 8: w = C/2; frontera en u = 1/2
+        (6.0, 3.0, -1.0),      # frontera en u = 1/3; x5 bien clasificado
+        (20.0, 4.0, -1.0),     # C >= 8: margen duro
+    ],
+)
+def test_hand_example_soft_margin_path_in_C(C, w_expected, b_expected):
+    # Sección IV-C (reemplazo): cinco puntos y camino de la solución en C.
+    X = np.array([[2.0, 0.0], [2.0, 1.0], [0.0, 0.0], [0.0, 1.0], [0.5, 0.0]])
+    y = np.array([1.0, 1.0, -1.0, -1.0, 1.0])
+    own = SMOBinary(C=C, kernel="linear", tol=1e-10).fit(X, y)
+    ref = SVC(C=C, kernel="linear", tol=1e-10).fit(X, y)
+    w = (own.alpha_ * y) @ X
+    np.testing.assert_allclose(w, [w_expected, 0.0], atol=1e-6)
+    np.testing.assert_allclose(ref.coef_[0], [w_expected, 0.0], atol=1e-5)
+    assert own.b_ == pytest.approx(b_expected, abs=1e-6)
+    assert ref.intercept_[0] == pytest.approx(b_expected, abs=1e-5)
+
+
+def test_ovo_lexicographic_tie_break_table7():
+    # Tabla 7: votos (1,1,1), márgenes (0.2,-0.3,0.1) -> gana A.
+    votes = np.array([[1, 1, 1], [1, 1, 1], [2, 1, 0]])
+    margins = np.array([[0.2, -0.3, 0.1], [0.1, 0.1, 0.1], [-1e12, 1e12, 0.0]])
+    choice = SMOOneVsOne._lexicographic_choice(votes, margins)
+    # Fila 2: empate total -> primera clase. Fila 3: los votos dominan
+    # aunque el margen sea enorme (la regla v + 1e-9 S elegiría B).
+    assert choice.tolist() == [0, 0, 0]
+
+
+def test_global_history_ends_at_certified_residual():
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(60, 2))
+    y = np.where(X[:, 0] + 0.3 * rng.normal(size=60) > 0, 1.0, -1.0)
+    own = SMOBinary(C=2.0, kernel="rbf", gamma=0.5, tol=1e-4).fit(X, y)
+    assert own.gap_history_[-1] == pytest.approx(own.kkt_gap_)
+    assert own.gap_history_[-1] <= own.tol
+    # El dual no decrece: SMO solo acepta pasos de ganancia no negativa.
+    assert np.all(np.diff(own.dual_history_) >= -1e-10)

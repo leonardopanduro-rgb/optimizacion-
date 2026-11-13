@@ -10,7 +10,11 @@ Decisiones metodológicas importantes:
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+import platform
+import subprocess
 from pathlib import Path
 from time import perf_counter
 
@@ -48,6 +52,112 @@ CLASSES = ["BARBUNYA", "BOMBAY", "CALI", "DERMASON", "HOROZ", "SEKER", "SIRA"]
 C_VALUES = [float(2**e) for e in [-5, -1, 3, 7]]
 COARSE_C_EXP = [-5, -1, 3, 7, 11]
 COARSE_GAMMA_EXP = [-15, -11, -7, -3, 1]
+BOOTSTRAP_REPS = 2000
+
+
+def _environment(root):
+    """Versiones exactas y hardware de la corrida (necesario para E5)."""
+    import importlib.metadata as md
+    import sklearn
+
+    def _cmd(args):
+        try:
+            return subprocess.run(args, capture_output=True, text=True, cwd=root, timeout=10).stdout.strip()
+        except Exception:
+            return ""
+
+    cpu = platform.processor()
+    try:
+        for line in Path("/proc/cpuinfo").read_text().splitlines():
+            if line.startswith("model name"):
+                cpu = line.split(":", 1)[1].strip()
+                break
+    except OSError:
+        pass
+    ram_gb = None
+    try:
+        ram_gb = round(os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30, 2)
+    except (ValueError, OSError, AttributeError):
+        pass
+    packages = {}
+    for name in ["numpy", "pandas", "scikit-learn", "scipy", "matplotlib", "seaborn", "openpyxl"]:
+        try:
+            packages[name] = md.version(name)
+        except md.PackageNotFoundError:
+            packages[name] = None
+    return {
+        "git_sha": _cmd(["git", "rev-parse", "HEAD"]),
+        "git_dirty": bool(_cmd(["git", "status", "--porcelain", "--untracked-files=no"])),
+        "python": platform.python_version(),
+        "os": platform.platform(),
+        "cpu": cpu,
+        "logical_cores": os.cpu_count(),
+        "ram_gb": ram_gb,
+        "packages": packages,
+        "sklearn_build": sklearn.__version__,
+    }
+
+
+def _fingerprint(root, extra):
+    """Huella de datos + configuración + versiones para validar la caché."""
+    import sklearn
+
+    data_hash = hashlib.sha256((root / "data" / "Dry_Bean_Dataset.xlsx").read_bytes()).hexdigest()
+    payload = {
+        "data_sha256": data_hash,
+        "seed": SEED,
+        "coarse_C_exp": COARSE_C_EXP,
+        "coarse_gamma_exp": COARSE_GAMMA_EXP,
+        "numpy": np.__version__,
+        "sklearn": sklearn.__version__,
+        **extra,
+    }
+    return payload
+
+
+def _cache_valid(meta_path, fingerprint):
+    if not meta_path.exists():
+        return False
+    try:
+        return json.loads(meta_path.read_text(encoding="utf-8")) == fingerprint
+    except (OSError, json.JSONDecodeError):
+        return False
+
+
+def _paired_bootstrap(y_true, pred_a, pred_b, reps=BOOTSTRAP_REPS, seed=SEED):
+    """IC 95 % percentil de F1macro(b) - F1macro(a) remuestreando el test.
+
+    Es pareado: cada réplica usa los mismos índices para ambas estrategias.
+    No requiere reentrenar; mide la incertidumbre por muestreo del test,
+    no la variabilidad del entrenamiento.
+    """
+    y_true = np.asarray(y_true)
+    pred_a = np.asarray(pred_a)
+    pred_b = np.asarray(pred_b)
+    rng = np.random.default_rng(seed)
+    n = len(y_true)
+    diffs = np.empty(reps)
+    for r in range(reps):
+        idx = rng.integers(0, n, n)
+        diffs[r] = f1_score(y_true[idx], pred_b[idx], average="macro", labels=CLASSES, zero_division=0) - f1_score(
+            y_true[idx], pred_a[idx], average="macro", labels=CLASSES, zero_division=0
+        )
+    observed = f1_score(y_true, pred_b, average="macro") - f1_score(y_true, pred_a, average="macro")
+    a_ok = pred_a == y_true
+    b_ok = pred_b == y_true
+    return {
+        "observed_diff": float(observed),
+        "ci95_low": float(np.quantile(diffs, 0.025)),
+        "ci95_high": float(np.quantile(diffs, 0.975)),
+        "bootstrap_sd": float(diffs.std(ddof=1)),
+        "share_diff_le_0": float(np.mean(diffs <= 0)),
+        "reps": reps,
+        "n_test": n,
+        "only_a_correct": int(np.sum(a_ok & ~b_ok)),
+        "only_b_correct": int(np.sum(~a_ok & b_ok)),
+        "both_wrong": int(np.sum(~a_ok & ~b_ok)),
+        "identical_predictions": int(np.sum(pred_a == pred_b)),
+    }
 
 
 def _pipeline(kernel="rbf", **kwargs):
@@ -252,19 +362,37 @@ def _run_smo_checks(X_train, y_train, binary_pair, best_binary, resultdir, figdi
         "dual_libsvm": dual_ref,
         "max_abs_score_difference": float(np.max(np.abs(own_score - ref_score))),
         "prediction_agreement": float(np.mean(own.predict(xs) == ref.predict(xs))),
+        "termination_reason": own.termination_reason_,
+        "pointwise_kkt_max_violation": own.pointwise_kkt_violation(),
+        "alpha_min": float(own.alpha_.min()),
+        "alpha_max_minus_C": float(own.alpha_.max() - C),
+        "bias_own": own.b_,
+        "bias_libsvm": float(ref.intercept_[0]),
         "support_vectors_own": len(own.support_),
         "support_vectors_libsvm": len(ref.support_),
     }
     pd.DataFrame([comparison]).to_csv(resultdir / "e1_smo_vs_libsvm.csv", index=False)
 
-    plt.figure(figsize=(7, 4))
-    history = own.gap_history_
-    plt.semilogy(np.arange(1, len(history) + 1), history, color="#176B87")
-    plt.axhline(own.tol, color="#B23A48", linestyle="--", label=f"tolerancia = {own.tol:g}")
-    plt.title("Convergencia del SMO propio: brecha KKT")
-    plt.xlabel("Actualización de pareja")
-    plt.ylabel("m - M (escala log)")
-    plt.legend()
+    pd.DataFrame(
+        {
+            "iteration": np.arange(len(own.gap_history_)),
+            "global_kkt_residual": own.gap_history_,
+            "dual_objective": own.dual_history_,
+        }
+    ).to_csv(resultdir / "e1_convergencia_global.csv", index=False)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
+    history = np.maximum(own.gap_history_, 1e-12)
+    ax1.semilogy(np.arange(len(history)), history, color="#176B87")
+    ax1.axhline(own.tol, color="#B23A48", linestyle="--", label=f"tolerancia = {own.tol:g}")
+    ax1.set_title("Residuo KKT global m − M")
+    ax1.set_xlabel("iteración")
+    ax1.set_ylabel("m − M (escala log)")
+    ax1.legend()
+    ax2.plot(np.arange(len(own.dual_history_)), own.dual_history_, color="#176B87", label="SMO propio")
+    ax2.axhline(dual_ref, color="#B23A48", linestyle="--", label="LIBSVM")
+    ax2.set_title("Objetivo dual D(α)")
+    ax2.set_xlabel("iteración")
+    ax2.legend()
     _save_fig(figdir / "06_convergencia_smo.png")
     return comparison
 
@@ -308,6 +436,15 @@ def _run_custom_multiclass_demo(X_train, y_train, X_test, y_test, C, gamma, resu
                 "fit_s": fit_s,
                 "predict_s": pred_s,
                 "n_modelos_binarios": len(model.models_),
+                "modelos_convergidos": int(
+                    sum(
+                        (m if isinstance(m, SMOBinary) else m[2]).converged_
+                        for m in model.models_
+                    )
+                ),
+                "max_kkt_residual": float(
+                    max((m if isinstance(m, SMOBinary) else m[2]).kkt_gap_ for m in model.models_)
+                ),
             }
         )
     result = pd.DataFrame(rows)
@@ -352,6 +489,8 @@ def _run_timings(X_train, y_train, X_test, y_test, C, gamma, resultdir, figdir):
             fit_q1_s=("fit_s", lambda s: s.quantile(0.25)),
             fit_q3_s=("fit_s", lambda s: s.quantile(0.75)),
             predict_median_500_s=("predict_500_s", "median"),
+            predict_q1_500_s=("predict_500_s", lambda s: s.quantile(0.25)),
+            predict_q3_500_s=("predict_500_s", lambda s: s.quantile(0.75)),
         )
         .reset_index()
     )
@@ -369,6 +508,8 @@ def _run_timings(X_train, y_train, X_test, y_test, C, gamma, resultdir, figdir):
                 "c": float(np.exp(intercept)),
                 "theta": float(theta),
                 "r2_log_log": float(r2_score(log_t, fitted)),
+                "n_min": int(part["n_train"].min()),
+                "n_max": int(part["n_train"].max()),
             }
         )
     fit_table = pd.DataFrame(fits)
@@ -424,7 +565,14 @@ def _run_timings(X_train, y_train, X_test, y_test, C, gamma, resultdir, figdir):
     k_raw.to_csv(resultdir / "e5_tiempos_por_k_repeticiones.csv", index=False)
     k_summary = (
         k_raw.groupby(["k", "strategy"])
-        .agg(fit_median_s=("fit_s", "median"), predict_median_300_s=("predict_300_s", "median"))
+        .agg(
+            fit_median_s=("fit_s", "median"),
+            fit_q1_s=("fit_s", lambda s: s.quantile(0.25)),
+            fit_q3_s=("fit_s", lambda s: s.quantile(0.75)),
+            predict_median_300_s=("predict_300_s", "median"),
+            predict_q1_300_s=("predict_300_s", lambda s: s.quantile(0.25)),
+            predict_q3_300_s=("predict_300_s", lambda s: s.quantile(0.75)),
+        )
         .reset_index()
     )
     k_summary.to_csv(resultdir / "e5_tiempos_por_k_resumen.csv", index=False)
@@ -444,6 +592,9 @@ def run_all(root):
     figdir.mkdir(exist_ok=True)
     resultdir.mkdir(exist_ok=True)
 
+    t_start = perf_counter()
+    env = _environment(root)
+    (resultdir / "environment.json").write_text(json.dumps(env, indent=2, ensure_ascii=False), encoding="utf-8")
     print("[1/8] Cargando y limpiando datos...", flush=True)
     raw = pd.read_excel(root / "data" / "Dry_Bean_Dataset.xlsx")
     if raw.shape != (13611, 17) or "Class" not in raw.columns:
@@ -464,7 +615,12 @@ def run_all(root):
 
     print("[2/8] CV multiclase de 5 pliegues con rejilla base 2...", flush=True)
     multi_cv_path = resultdir / "e4_cv_multiclase_rbf.csv"
-    if multi_cv_path.exists():
+    cache_meta = resultdir / "cache_meta.json"
+    fingerprint = _fingerprint(root, {"stage": "multiclass_rbf_cv"})
+    cache_ok = multi_cv_path.exists() and _cache_valid(cache_meta, fingerprint)
+    if multi_cv_path.exists() and not cache_ok:
+        print("      Caché descartada: datos, configuración o versiones no coinciden.", flush=True)
+    if cache_ok:
         print("      Reutilizando resultados multiclase ya calculados.", flush=True)
         cv_multi = pd.read_csv(multi_cv_path)
         best_row = cv_multi.loc[cv_multi["mean_test_f1_macro"].idxmax()]
@@ -475,6 +631,7 @@ def run_all(root):
     else:
         multi_search, cv_multi = _staged_rbf_search(X_train, y_train)
         cv_multi.to_csv(multi_cv_path, index=False)
+        cache_meta.write_text(json.dumps(fingerprint, indent=2), encoding="utf-8")
         best_C = float(multi_search.best_params_["svc__C"])
         best_gamma = float(multi_search.best_params_["svc__gamma"])
         best_cv_f1 = float(multi_search.best_score_)
@@ -578,6 +735,14 @@ def run_all(root):
             )
         ).T.to_csv(resultdir / f"e3_reporte_{strategy}.csv")
     pd.DataFrame(multiclass).T.to_csv(resultdir / "e3_comparacion_ovr_ovo.csv")
+    bootstrap = _paired_bootstrap(
+        y_test, multiclass_predictions["OvR"], multiclass_predictions["OvO"]
+    )
+    pd.DataFrame([bootstrap]).to_csv(resultdir / "e3_bootstrap_ovo_menos_ovr.csv", index=False)
+    cm_ovr = confusion_matrix(y_test, multiclass_predictions["OvR"], labels=CLASSES)
+    pd.DataFrame(cm_ovr, index=CLASSES, columns=CLASSES).to_csv(
+        resultdir / "e3_matriz_confusion_ovr_test.csv"
+    )
     cm_test = confusion_matrix(y_test, multiclass_predictions["OvO"], labels=CLASSES)
     pd.DataFrame(cm_test, index=CLASSES, columns=CLASSES).to_csv(
         resultdir / "e3_matriz_confusion_ovo_test.csv"
@@ -593,7 +758,7 @@ def run_all(root):
     cv_multi["C"] = cv_multi["param_svc__C"].astype(float)
     cv_multi["gamma"] = cv_multi["param_svc__gamma"].astype(float)
     support_path = resultdir / "e4_vectores_soporte.csv"
-    if support_path.exists():
+    if support_path.exists() and cache_ok:
         support_table = pd.read_csv(support_path)
     else:
         evaluated_pairs = cv_multi[["C", "gamma"]].drop_duplicates().itertuples(index=False, name=None)
@@ -673,6 +838,9 @@ def run_all(root):
         "custom_multiclass_demo": custom_multi.to_dict(orient="records"),
         "multiclass_test": multiclass,
         "timing_power_fit": power_fit.to_dict(orient="records"),
+        "e3_bootstrap_ovo_minus_ovr": bootstrap,
+        "environment": env,
+        "total_runtime_s": perf_counter() - t_start,
         "notes": {
             "no_imputation": "No hay faltantes; se usa StandardScaler dentro del pipeline.",
             "test_policy": "El test se usa una sola vez para métricas finales.",
