@@ -1,0 +1,135 @@
+{
+  "proposito": "Reproduccion completa de E1-E5 (semilla 42) sobre la rama hito2 y comparacion con la corrida recibida (ZIP, commit 3d6ba52).",
+  "entorno_reproduccion": {
+    "git_sha": "cc118f06c369378baffab85ac457d3e39db7f6be",
+    "git_dirty": false,
+    "python": "3.13.18",
+    "os": "Linux-6.18.44-fc-v470-x86_64-with-glibc2.39",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.30GHz",
+    "logical_cores": 4,
+    "ram_gb": 15.71,
+    "packages": {
+      "numpy": "2.5.3",
+      "pandas": "3.0.5",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.18.1",
+      "matplotlib": "3.11.2",
+      "seaborn": "0.13.2",
+      "openpyxl": "3.1.5"
+    },
+    "sklearn_build": "1.9.1"
+  },
+  "entorno_recibido": {
+    "git_sha": "3d6ba529092551890fc9721ef87eacfdc7d1127b",
+    "git_dirty": true,
+    "python": "3.13.18",
+    "os": "Linux-6.18.44-fc-v445-x86_64-with-glibc2.39",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "logical_cores": 2,
+    "ram_gb": 7.83,
+    "packages": {
+      "numpy": "2.5.3",
+      "pandas": "3.0.5",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.18.1",
+      "matplotlib": "3.11.2",
+      "seaborn": "0.13.2",
+      "openpyxl": "3.1.5"
+    },
+    "sklearn_build": "1.9.1"
+  },
+  "e1": {
+    "iterations": {
+      "recibido": 244,
+      "reproduccion": 244
+    },
+    "m_minus_M": {
+      "recibido": 0.0009041307654555908,
+      "reproduccion": 0.0009041307654555908
+    },
+    "dual_own": {
+      "recibido": 636.5527593037673,
+      "reproduccion": 636.5527593037673
+    },
+    "dual_libsvm": {
+      "recibido": 636.5528489255445,
+      "reproduccion": 636.5528489255445
+    },
+    "pointwise_kkt_max_violation": {
+      "recibido": 0.0005544126187082554,
+      "reproduccion": 0.0005544126187082554
+    },
+    "prediction_agreement": {
+      "recibido": 1.0,
+      "reproduccion": 1.0
+    },
+    "support_vectors_own": {
+      "recibido": 95,
+      "reproduccion": 95
+    },
+    "support_vectors_libsvm": {
+      "recibido": 95,
+      "reproduccion": 95
+    },
+    "bias_own": {
+      "recibido": -1.9073830478824707,
+      "reproduccion": -1.9073830478824707
+    },
+    "bias_libsvm": {
+      "recibido": -1.910466353401547,
+      "reproduccion": -1.910466353401547
+    },
+    "max_abs_score_difference": {
+      "recibido": 0.001762003011626767,
+      "reproduccion": 0.001762003011626767
+    }
+  },
+  "e2_test_f1_macro": {
+    "Lineal": {
+      "recibido": 0.9105967450271248,
+      "reproduccion": 0.9105967450271248
+    },
+    "Polinomial": {
+      "recibido": 0.9110788377557916,
+      "reproduccion": 0.9110788377557916
+    },
+    "RBF": {
+      "recibido": 0.9162857133277227,
+      "reproduccion": 0.9162857133277227
+    }
+  },
+  "e3": {
+    "OvR": {
+      "recibido_f1": 0.9337275019330714,
+      "reproduccion_f1": 0.9337275019330714,
+      "recibido_fit_s": 1.418935146000024,
+      "reproduccion_fit_s": 1.1765289980000375
+    },
+    "OvO": {
+      "recibido_f1": 0.934961311771873,
+      "reproduccion_f1": 0.934961311771873,
+      "recibido_fit_s": 0.4308462639999675,
+      "reproduccion_fit_s": 0.37449728200004984
+    }
+  },
+  "e3_bootstrap": {
+    "observed_diff": {
+      "recibido": 0.0012338098388016139,
+      "reproduccion": 0.0012338098388016139
+    },
+    "ci95_low": {
+      "recibido": -0.002968675866219958,
+      "reproduccion": -0.002968675866219958
+    },
+    "ci95_high": {
+      "recibido": 0.005606431178131442,
+      "reproduccion": 0.005606431178131442
+    },
+    "identical_predictions": {
+      "recibido": 2670,
+      "reproduccion": 2670
+    }
+  },
+  "conclusion": "Todas las metricas coinciden exactamente; solo difieren los tiempos (E5 y fit_s), que dependen de la maquina.",
+  "pruebas": "18 passed (pytest), ver pruebas_finales.xml"
+}

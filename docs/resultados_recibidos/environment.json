@@ -1,0 +1,19 @@
+{
+  "git_sha": "3d6ba529092551890fc9721ef87eacfdc7d1127b",
+  "git_dirty": true,
+  "python": "3.13.18",
+  "os": "Linux-6.18.44-fc-v445-x86_64-with-glibc2.39",
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "logical_cores": 2,
+  "ram_gb": 7.83,
+  "packages": {
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "scikit-learn": "1.9.1",
+    "scipy": "1.18.1",
+    "matplotlib": "3.11.2",
+    "seaborn": "0.13.2",
+    "openpyxl": "3.1.5"
+  },
+  "sklearn_build": "1.9.1"
+}

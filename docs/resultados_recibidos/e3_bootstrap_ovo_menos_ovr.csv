@@ -1,0 +1,2 @@
+observed_diff,ci95_low,ci95_high,bootstrap_sd,share_diff_le_0,reps,n_test,only_a_correct,only_b_correct,both_wrong,identical_predictions
+0.0012338098388016139,-0.002968675866219958,0.005606431178131442,0.002207093353298659,0.2865,2000,2709,16,19,191,2670

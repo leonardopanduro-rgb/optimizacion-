@@ -1,0 +1,2 @@
+n_subset,C,gamma,iterations,converged,m,M,m_minus_M,equality_residual,dual_own,dual_libsvm,max_abs_score_difference,prediction_agreement,termination_reason,pointwise_kkt_max_violation,alpha_min,alpha_max_minus_C,bias_own,bias_libsvm,support_vectors_own,support_vectors_libsvm
+400,8.0,0.00390625,244,True,-1.9068286352637678,-1.9077327660292234,0.0009041307654555908,1.7763568394002505e-15,636.5527593037673,636.5528489255445,0.001762003011626767,1.0,converged,0.0005544126187082554,0.0,0.0,-1.9073830478824707,-1.910466353401547,95,95
