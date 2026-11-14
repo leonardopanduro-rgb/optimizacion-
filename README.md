@@ -28,15 +28,25 @@ Los datos se dividen en:
 | E4 | Incluye exactitud, F1 macro y cantidad de vectores soporte. |
 | E5 | Tres repeticiones, mediana, IQR, ajuste `T(m)=c·m^theta` y `R²`. |
 
-## Resultados principales de la corrida incluida
+## Resultados principales de la corrida incluida (Hito II)
 
 - Mejor RBF multiclase por CV: `C=64`, `gamma=0.015625`, F1 macro CV `0.9448`.
-- La selección OOF encontró 348 confusiones entre DERMASON y SIRA.
-- Caso binario: RBF obtuvo F1 macro CV `0.9285` y F1 macro test `0.9163`.
-- Multiclase: OvR obtuvo F1 macro test `0.9337`; OvO, `0.9350`.
-- SMO propio: concordancia con LIBSVM `1.0000`, brecha KKT `m-M=0.000926` y residuo de igualdad cercano a cero.
+- La selección OOF encontró 348 confusiones entre DERMASON y SIRA; la misma pareja salió elegida en las diez particiones adicionales.
+- Caso binario: RBF obtuvo F1 macro CV `0.9285` y F1 macro test `0.9163`. En diez particiones nuevas RBF supera al lineal en 9 de 10 (+0.0038 de media).
+- Multiclase a configuración común (`C=64`, `gamma=2^-6`): OvR F1 macro test `0.9337`; OvO `0.9350`. La diferencia (+0.0012) tiene IC 95 % bootstrap `[-0.0030, +0.0056]` y cambia de signo entre particiones (media de diez semillas: `-0.0005`). **OvR y OvO no se distinguen en desempeño predictivo**; lo que cambia es el costo (OvO entrena ~2 veces más rápido con 8 000 filas y predice algo más lento).
+- SMO propio (E1, 400 filas): 244 iteraciones, residuo KKT global `m-M=0.000904`, |D_propio − D_LIBSVM| = `9.0e-5`, máxima violación KKT puntual `5.5e-4`, concordancia de predicciones `1.0000`, 95 vectores soporte en ambos.
+- El buen desempeño en (C, gamma) ocupa una meseta ancha (14 de 33 configuraciones con F1 ≥ 0.940), no un punto.
 
-La ventaja de OvO es pequeña: el resultado correcto es “fue ligeramente mejor en esta partición”, no “siempre es superior”.
+## Qué cambió en el Hito II
+
+- `SMOBinary` registra el **residuo KKT global** `m-M` y el objetivo dual `D(α)` en cada iteración (`gap_history_`, `dual_history_`); la antigua diferencia del par actualizado se conserva en `pair_gap_history_`. Nuevo método `pointwise_kkt_violation()`.
+- `SMOOneVsOne` desempata de forma **lexicográfica** (votos → margen acumulado → orden de clase) en lugar de `votos + 1e-9·margen`.
+- E3 añade un **bootstrap pareado** (2 000 réplicas) de la diferencia OvO − OvR y la matriz de confusión de OvR.
+- E5 reporta cuartiles de predicción y del barrido por número de clases.
+- `results/environment.json` registra SHA, versiones exactas, CPU, núcleos, RAM y SO de cada corrida.
+- La caché de la búsqueda multiclase se valida con una huella SHA-256 de datos + rejilla + semilla + versiones (`results/cache_meta.json`); si algo cambia, se recalcula sola.
+- `run_seeds.py` repite todo el protocolo (partición, búsqueda, selección del par, E2, E3 con bootstrap) para las semillas 1–10.
+- Pruebas: 18 (incluyen los ejemplos a mano del informe: margen duro, dos puntos, camino de la solución en C, curvatura nula, desempate OvO).
 
 ## Cómo abrirlo
 
@@ -55,11 +65,12 @@ Luego abre `OPTI.ipynb`. Para leerlo no necesitas recalcular nada.
 ## Cómo verificar y regenerar
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe run_experiments.py
+.\.venv\Scripts\python.exe -m pytest -q        # 18 passed
+.\.venv\Scripts\python.exe run_experiments.py  # E1-E5 con semilla 42, ~2-4 min
+.\.venv\Scripts\python.exe run_seeds.py        # remuestreo de 10 semillas, ~15-30 min
 ```
 
-La ejecución completa puede tardar varios minutos. Los resultados multiclase ya calculados se reutilizan si existe `results/e4_cv_multiclase_rbf.csv`. Para forzar una búsqueda totalmente nueva, elimina solo ese CSV y vuelve a ejecutar.
+La búsqueda multiclase se reutiliza solo si `results/cache_meta.json` coincide con los datos, la rejilla, la semilla y las versiones instaladas; en caso contrario se recalcula automáticamente. Las métricas de SVC/LIBSVM son deterministas; los tiempos de E5 dependen de la máquina (ver `results/environment.json`).
 
 ## Estructura
 
@@ -69,9 +80,11 @@ data/Dry_Bean_Dataset.xlsx   copia original de los datos
 src/smo.py                   SMO propio y wrappers OvR/OvO
 src/experiments.py           protocolo E1–E5 y generación de resultados
 run_experiments.py           entrada para repetir todos los experimentos
-tests/test_smo.py            comparación automática con LIBSVM
+run_seeds.py                 protocolo de remuestreo con 10 semillas (Hito II)
+tests/test_smo.py            comparación con LIBSVM y ejemplos a mano del informe
 figures/                     gráficas generadas por los experimentos
-results/                     tablas CSV y metrics.json
+results/                     tablas CSV, metrics.json, environment.json
+docs/hito2/                  informe del Hito II y copia de los resultados que cita
 RESULTADOS.md                relación de resultados, tablas y figuras
 ```
 
@@ -99,4 +112,4 @@ El archivo proviene de [UCI Dry Bean](https://archive.ics.uci.edu/dataset/602/dr
 - La implementación NumPy de SMO se valida en subconjuntos por su costo de memoria `O(n²)`; los experimentos completos usan `SVC`/LIBSVM.
 - Los tiempos dependen del equipo y no demuestran por sí solos complejidad asintótica.
 - El dataset contiene características numéricas extraídas de imágenes, no las fotografías originales.
-- El test representa una sola partición externa; no debe reutilizarse para volver a ajustar decisiones.
+- El test de la semilla 42 se consultó en el Hito I; por eso el Hito II evalúa la estabilidad de las conclusiones con diez particiones nuevas (semillas 1–10). Esas particiones reutilizan el mismo dataset y no son independientes entre sí.
