@@ -84,7 +84,10 @@ run_seeds.py                 protocolo de remuestreo con 10 semillas (Hito II)
 tests/test_smo.py            comparación con LIBSVM y ejemplos a mano del informe
 figures/                     gráficas generadas por los experimentos
 results/                     tablas CSV, metrics.json, environment.json
-docs/hito2/                  informe del Hito II y copia de los resultados que cita
+docs/informe/                informe del Hito II (Markdown y PDF)
+docs/resultados_recibidos/   copia de los CSV que cita el informe
+docs/figuras_hito2/          figuras del informe (docs/make_figures_hito2.py)
+verificacion_hito2/          reproducción en segunda máquina y registro de pruebas
 RESULTADOS.md                relación de resultados, tablas y figuras
 ```
 
