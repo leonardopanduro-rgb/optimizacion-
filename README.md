@@ -2,6 +2,12 @@
 
 Proyecto de clasificación de siete variedades de frijol seco mediante máquinas de vectores soporte (SVM). Incluye limpieza de datos, validación cruzada, una implementación de SMO, comparación de kernels, estrategias multiclase OvR/OvO, análisis de hiperparámetros y medición del costo computacional.
 
+## Integrantes
+
+Leonardo Panduro · Diego Godoy · Nayara Sernaqué · Jose Cruz
+
+**Profesor:** Víctor Torres Castillo
+
 ## Descripción del problema
 
 Cada observación contiene 16 medidas geométricas de un frijol. El objetivo es identificar a cuál de las siete variedades pertenece.
