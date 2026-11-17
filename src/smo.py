@@ -1,10 +1,3 @@
-"""Implementación didáctica de SVM binaria mediante SMO.
-
-El criterio de trabajo sigue la idea de *maximum violating pair*:
-se eligen los índices que maximizan la brecha ``m - M`` de KKT y se
-actualizan dos multiplicadores a la vez. La implementación permite comprobar
-numéricamente la solución dual y las condiciones KKT en conjuntos pequeños.
-"""
 
 from __future__ import annotations
 
@@ -275,11 +268,7 @@ class SMOOneVsOne:
 
     @staticmethod
     def _lexicographic_choice(votes, margins):
-        """Orden lexicográfico: más votos; luego mayor margen; luego primera clase.
-
-        Sustituye a votes + 1e-9 * margins, que no garantiza que los votos
-        dominen cuando los márgenes acumulados son grandes.
-        """
+        
         n_classes = votes.shape[1]
         order = np.arange(n_classes)
         # np.lexsort ordena por la última clave primero; se usa el signo para

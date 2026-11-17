@@ -1,23 +1,14 @@
-"""Experimentos reproducibles de clasificación con SVM: E1--E5.
-
-Decisiones metodológicas importantes:
-- se eliminan duplicados exactos antes de la partición;
-- no hay imputación porque no existen valores faltantes;
-- el test 20 % queda retenido hasta la evaluación final;
-- toda selección usa CV estratificada de cinco pliegues en entrenamiento;
-- la pareja binaria se elige con confusiones OOF del entrenamiento, nunca con test.
-"""
-
 from __future__ import annotations
 
 import hashlib
-import json
+import json3
 import os
 import platform
 import subprocess
 from pathlib import Path
 from time import perf_counter
 
+import joblib
 import matplotlib
 
 matplotlib.use("Agg")
@@ -727,6 +718,9 @@ def run_all(root):
         metrics, pred = _fit_and_measure(model, X_train, y_train, X_test, y_test)
         metrics["n_binary_models"] = len(model.named_steps["multi"].estimators_)
         metrics["support_vectors_sum"] = _support_count(model)
+        # Guarda el modelo final (StandardScaler + SVC RBF) para hacer predicciones
+        # sin reentrenar: joblib.load(...).predict(X_nuevo).
+        joblib.dump(model, resultdir / f"modelo_svm_{strategy}.joblib")
         multiclass[strategy] = metrics
         multiclass_predictions[strategy] = pred
         pd.DataFrame(
